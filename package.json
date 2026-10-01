@@ -15,7 +15,7 @@
     "ffmpeg",
     "video"
   ],
-  "author": "Tomás Fox <tomas.c.fox@gmail.com>",
+  "author": "FFmpegLab <info@ffmpeglab.com>",
   "license": "MIT",
   "exports": {
     "node": "./node.mjs",
