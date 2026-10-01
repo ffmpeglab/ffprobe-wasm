@@ -1,0 +1,8 @@
+scripts
+.github
+Makefile
+Dockerfile
+dist
+src
+build.sh
+publish.sh
