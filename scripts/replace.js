@@ -4,7 +4,7 @@ const { resolve } = require("path");
 main();
 
 async function main() {
-  const root = __dirname;
+  const root = __dirname.replace('/scripts', '');
 
   const wasmJsPath = resolve(root, "dist/ffprobe-wasm.js");
   const wasmMJsPath = resolve(root, "dist/ffprobe-wasm.mjs");
