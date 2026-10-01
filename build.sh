@@ -8,7 +8,7 @@ docker create -ti --name ffprobe-wasm-container ffprobe-wasm
 docker cp ffprobe-wasm-container:/build/dist .
 docker rm -fv ffprobe-wasm-container
 
-cp dist/* src/
+cp dist/* src
 ls src
 node scripts/replace.js
 cp src/*.d.* dist
