@@ -4,9 +4,7 @@
 set -e
 
 docker build -t ffprobe-wasm .
-docker create -ti --name ffprobe-wasm-container ffprobe-wasm
-docker cp ffprobe-wasm-container:/build/dist .
-docker rm -fv ffprobe-wasm-container
+docker-compose run ffprobe-wasm make
 
 node scripts/replace.js
 cp dist/* src
