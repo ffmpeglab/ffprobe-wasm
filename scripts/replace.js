@@ -1,10 +1,10 @@
 const { readFile, writeFile } = require("fs/promises");
-const { dirname, resolve } = require("path");
+const { resolve } = require("path");
 
 main();
 
 async function main() {
-  const root = dirname(__dirname);
+  const root = __dirname;
 
   const wasmJsPath = resolve(root, "dist/ffprobe-wasm.js");
   const wasmMJsPath = resolve(root, "dist/ffprobe-wasm.mjs");
