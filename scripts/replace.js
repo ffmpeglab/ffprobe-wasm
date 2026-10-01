@@ -6,7 +6,8 @@ main();
 async function main() {
   const root = dirname(__dirname);
 
-  const wasmJsPath = resolve(root, "dist/ffprobe-wasm.mjs");
+  const wasmJsPath = resolve(root, "dist/ffprobe-wasm.js");
+  const wasmMJsPath = resolve(root, "dist/ffprobe-wasm.mjs");
 
   let content = await readFile(wasmJsPath, { encoding: "utf8" });
 
@@ -23,5 +24,5 @@ ${content}`;
     `initWasm(info).then(receiveInstantiatedSource, readyPromiseReject)`
   );
 
-  await writeFile(wasmJsPath, content, { encoding: "utf8" });
+  await writeFile(wasmMJsPath, content, { encoding: "utf8" });
 }
