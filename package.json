@@ -1,0 +1,37 @@
+{
+  "name": "ffprobe-browser",
+  "version": "0.3.0",
+  "description": "ffprobe-like for browser and node, powered by WebAssembly",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ffmpeglab/ffprobe-wasm"
+  },
+  "bugs": {
+    "url": "https://github.com/ffmpeglab/ffprobe-wasm"
+  },
+  "keywords": [
+    "ffprobe",
+    "WebAssembly",
+    "ffmpeg",
+    "video"
+  ],
+  "author": "FFmpegLab <info@ffmpeglab.com>",
+  "license": "MIT",
+  "exports": {
+    "types": "./ffprobe-worker.d.mts",
+    "default": "./browser.mjs"
+  },
+  "main": "./browser.mjs",
+  "types": "./ffprobe-worker.d.mts",
+  "browser": "./browser.mjs",
+  "scripts": {
+    "build": "npm run tsc && npm run vite",
+    "tsc": "tsc",
+    "vite": "vite build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^5.7.3",
+    "vite": "^2.8.6"
+  }
+}
