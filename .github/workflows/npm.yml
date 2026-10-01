@@ -17,6 +17,7 @@ jobs:
           node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
       - run: ./build.sh
+      - run: npm i
       - run: node -e 'const json=require("./package.json");fs.writeFileSync("./package.json",JSON.stringify({...json, version:process.env.GITHUB_REF?.replace("refs/tags/", "")}, undefined, 2), "utf-8")' && cat package.json 
       - run: npm config set '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}" && npm publish
         env:
