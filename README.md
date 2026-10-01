@@ -2,7 +2,7 @@
 
 Gather information from multimedia streams. Works on the browser and Node.js.
 
-Uses the code at [alfg/ffprobe-wasm](https://github.com/alfg/ffprobe-wasm) & [tfoxy/ffprobe-wasm](https://github.com/tfoxy/ffprobe-wasm/) to bring you a single experience of building and packaging as well as a defintive community platform to manage the upgrades and issues.
+Uses the code at [alfg/ffprobe-wasm](https://github.com/alfg/ffprobe-wasm) & [tfoxy/ffprobe-wasm](https://github.com/tfoxy/ffprobe-wasm) to bring you a single experience of building and packaging as well as a defintive community platform to manage the upgrades and issues.
 
 _For limitations and recommendations, see [Notes section](#notes)._
 
