@@ -2,7 +2,7 @@ import { stat } from "fs/promises";
 import { basename, dirname } from "path";
 import { fileURLToPath } from "url";
 import { MessageChannel, Worker } from "worker_threads";
-import type { FFprobeWorker as AbstractFFprobeWorker } from "./ffprobe-worker.js";
+import type { FFprobeWorker as AbstractFFprobeWorker } from "./ffprobe-wasm.worker.js";
 import type {
   Chapter,
   Disposition,

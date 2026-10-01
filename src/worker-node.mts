@@ -1,6 +1,6 @@
 import { createRequire } from "module";
 import { parentPort } from "worker_threads";
-import type { FFprobe } from "./ffprobe-wasm.js";
+import * as FFprobe from "./ffprobe-wasm.js";
 import { createListener } from "./worker.mjs";
 
 if (!parentPort) {
