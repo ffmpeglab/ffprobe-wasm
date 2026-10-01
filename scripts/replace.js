@@ -8,6 +8,10 @@ async function main() {
 
   const wasmJsPath = resolve(root, "dist/ffprobe-wasm.js");
   const wasmMJsPath = resolve(root, "dist/ffprobe-wasm.mjs");
+  const wasm2JsPath = resolve(root, "dist/ffprobe-wasm.worker.js");
+  const wasm2MJsPath = resolve(root, "dist/ffprobe-wasm.worker.mjs");
+  const content2 = await readFile(wasm2JsPath, { encoding: "utf8" });
+  await writeFile(wasm2MJsPath, content2, { encoding: "utf8" });
 
   let content = await readFile(wasmJsPath, { encoding: "utf8" });
 

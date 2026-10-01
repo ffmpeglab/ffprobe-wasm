@@ -1,4 +1,4 @@
-import type { FFprobeWorker as AbstractFFprobeWorker } from "./ffprobe-worker.mjs";
+import type { FFprobeWorker as AbstractFFprobeWorker } from "./ffprobe-wasm.worker.mjs";
 import type {
   Chapter,
   Disposition,
