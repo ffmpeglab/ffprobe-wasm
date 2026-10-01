@@ -17,7 +17,7 @@ npm install ffmpeglab-ffprobe-wasm --save
 Node.js
 
 ```ts
-import { FFprobeWorker } from "ffprobe-wasm";
+import { FFprobeWorker } from "ffmpeglab-ffprobe-wasm";
 
 const worker = new FFprobeWorker();
 
@@ -28,7 +28,7 @@ console.log(fileInfo);
 Browser
 
 ```ts
-import { FFprobeWorker } from "ffprobe-wasm";
+import { FFprobeWorker } from "ffmpeglab-ffprobe-wasm";
 
 const worker = new FFprobeWorker();
 
