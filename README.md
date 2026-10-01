@@ -1,56 +1,48 @@
-# `FFProbe Wasm`
-> A Web-based FFProbe. Powered by FFmpeg & Web Assembly!
+# ffmpeglab-ffprobe-wasm
 
+Gather information from multimedia streams. Works on the browser and Node.js.
 
-## Development
-`ffprobe-wasm` uses [emscripten](https://emscripten.org/) to compile [FFmpeg](https://ffmpeg.org)'s [libav](https://ffmpeg.org/doxygen/4.1/index.html) to [Web Assembly](https://webassembly.org/) via [Docker](https://www.docker.com/).
+Uses the code at [alfg/ffprobe-wasm](https://github.com/alfg/ffprobe-wasm) & [tfoxy/ffprobe-wasm](https://github.com/tfoxy/ffprobe-wasm/) to bring you a single experience of building and packaging as well as a defintive community platform to manage the upgrades and issues.
 
-Emscripten is also used to create and compile the Wasm bindings to be imported by the browser.
+_For limitations and recommendations, see [Notes section](#notes)._
 
-### Requirements
-* `nodejs` - https://nodejs.org/en/download/
-* `docker` - https://docs.docker.com/desktop/
+## Installation
 
-### Setup 
-* Clone project and build the Wasm module via Docker:
-```
-docker-compose run ffprobe-wasm make
+```sh
+npm install ffmpeglab-ffprobe-wasm --save
 ```
 
-This will build the Wasm module and place it into the `/dist` directory.
+## Examples
 
-* Copy the JS and Wasm modules into `www/public/`:
-```
-cp -a dist/. www/public/
-```
+Node.js
 
-* Install and run the web application:
-```
-cd www
-npm install
-npm run serve
-```
+```ts
+import { FFprobeWorker } from "ffprobe-wasm";
 
-* Load `http://localhost:8080/` in the web browser.
+const worker = new FFprobeWorker();
 
-### Compiles and minifies for production
-```
-npm run build
+const fileInfo = await worker.getFileInfo("file.mp4");
+console.log(fileInfo);
 ```
 
-### Deploy
-Builds and deploys to `gh-pages` branch.
+Browser
 
-However, I am hosting on [Netlify](https://netlify.com) to enable [SharedArrayBuffer](https://caniuse.com/sharedarraybuffer) support via the [required CORS headers](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer).
+```ts
+import { FFprobeWorker } from "ffprobe-wasm";
+
+const worker = new FFprobeWorker();
+
+// input is the reference to an <input type="file" /> element
+input.addEventListener("change", (event) => {
+  const file = event.target.files[0];
+  const fileInfo = await worker.getFileInfo(file);
+  console.log(fileInfo);
+});
 ```
-npm run deploy
-```
 
-### Resources
-* https://ffmpeg.org/doxygen/4.1/index.html
-* https://emscripten.org/
-* https://vuejs.org
-* https://bootstrap-vue.org
+## Notes
 
-## License
-MIT
+- This project doesn't build or use FFprobe. Instead it uses FFmpeg's libavformat and libavcodec to output similar results. This means that not everything that FFprobe supports is bundled, so there are some containers and codecs that are not supported.
+- In Node.js, it works on version >= 16.
+- In browser, `SharedArrayBuffer` is being used. To enable this in your server, read [Security requirements](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer#security_requirements).
+- In browser, everything is bundled in the `browser.mjs` script. When gzipped, this file is bigger than 1 MiB, so it's recommended to use `import()` to lazy load the asset. The good side of this is that you don't have to configure your bundler to include the worker or wasm files and you won't face [same-origin](https://developer.mozilla.org/en-US/docs/Web/API/Worker/Worker) issues with the worker.

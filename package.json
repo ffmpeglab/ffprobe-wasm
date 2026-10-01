@@ -4,10 +4,10 @@
   "description": "ffprobe-like for browser and node, powered by WebAssembly",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tfoxy/ffprobe-wasm"
+    "url": "https://github.com/ffmpeglab/ffprobe-wasm"
   },
   "bugs": {
-    "url": "https://github.com/tfoxy/ffprobe-wasm/issues"
+    "url": "https://github.com/ffmpeglab/ffprobe-wasm"
   },
   "keywords": [
     "ffprobe",
