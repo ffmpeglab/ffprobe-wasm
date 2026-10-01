@@ -11,9 +11,9 @@ docker rm -fv ffprobe-wasm-container
 node scripts/replace.js
 cp dist/* src
 ls src
-ls src/ffprobe-wasm-container
-cp src/*.d.* dist
-
 # Build browser/node workers
 npm i
 npm run build
+
+cp src/*.d.* dist
+
