@@ -1,7 +1,6 @@
 # `FFProbe Wasm`
-> A Web-based FFProbe. Powered by FFmpeg, Vue and Web Assembly!
+> A Web-based FFProbe. Powered by FFmpeg & Web Assembly!
 
-https://ffprobe-wasm.netlify.app/
 
 ## Development
 `ffprobe-wasm` uses [emscripten](https://emscripten.org/) to compile [FFmpeg](https://ffmpeg.org)'s [libav](https://ffmpeg.org/doxygen/4.1/index.html) to [Web Assembly](https://webassembly.org/) via [Docker](https://www.docker.com/).
