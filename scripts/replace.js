@@ -34,7 +34,14 @@ ${content}`;
     throw new Error("post-build: `instantiateAsync();` not found");
   }
   content = content.replace(from, to);
-
+  const finalRun = `run();`;
+  if (!content.includes(finalRun)) {
+    throw new Error("post-build: final `run();` not found");
+  }
+  content = content.replace(
+    finalRun,
+    `${finalRun}\nexport default Module;`,
+  );
   await writeFile(wasmMJsPath, content, { encoding: "utf8" });
   await writeFile(wasmMJsPathSav, content, { encoding: "utf8" });
 }
