@@ -18,6 +18,9 @@ export default defineConfig({
     sourcemap: true,
   },
   worker: {
+    rollupOptions: {
+      external: [ '/ffprobe-wasm.wasm' ]
+    },
     plugins: [
       {
         name: "append-source-url",
