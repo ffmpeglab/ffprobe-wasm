@@ -1,7 +1,5 @@
 import { resolve } from "path";
 import { defineConfig } from "vite";
-import wasm from "vite-plugin-wasm";
-import topLevelAwait from "vite-plugin-top-level-await";
 
 const sourceUrlPlugin = {
   name: "append-source-url",
@@ -13,10 +11,9 @@ const sourceUrlPlugin = {
 };
 
 export default defineConfig({
-  plugins: [wasm(), topLevelAwait()],
   worker: {
-    format: "es",
-    plugins: [wasm(), topLevelAwait(), sourceUrlPlugin],
+    format: "es",                                       // your worker is ESM
+    plugins: [sourceUrlPlugin],
   },
   build: {
     outDir: resolve(__dirname, "dist"),
