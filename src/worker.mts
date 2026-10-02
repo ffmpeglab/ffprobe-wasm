@@ -6,7 +6,7 @@ import type {
   FSMountOptions,
   Raw,
   Vector,
-} from "./ffprobe-wasm.js";
+} from "./ffprobe-wasm-shared";
 import { FileInfo, FramesInfo, Stream } from "./types.mjs";
 
 export type IncomingMessage = {
