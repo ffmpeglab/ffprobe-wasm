@@ -17,7 +17,7 @@ async function main() {
   let content = await readFile(wasmJsPath, { encoding: "utf8" });
 
   content = `\
-import initWasmInstance from "/ffprobe-wasm.wasm";
+import initWasmInstance from "./ffprobe-wasm.wasm";
 const initWasm = (info) =>
   initWasmInstance(info).then((exports) => ({ instance: { exports } }));
 ${content}`;
