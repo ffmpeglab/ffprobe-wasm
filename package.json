@@ -1,5 +1,5 @@
 {
-  "name": "ffmpeglab-ffprobe-wasm",
+  "name": "ffprobe-browser",
   "version": "0.3.0",
   "description": "ffprobe-like for browser and node, powered by WebAssembly",
   "repository": {
