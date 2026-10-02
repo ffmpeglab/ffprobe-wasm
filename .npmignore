@@ -1,1 +1,9 @@
 src
+node_modules
+scripts
+.github
+vite.config.ts
+tsconfig.json
+package-lock.json
+Makefile
+Dockerfile
