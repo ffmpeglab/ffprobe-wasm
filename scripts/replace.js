@@ -16,18 +16,18 @@ async function main() {
 
   let content = await readFile(wasmJsPath, { encoding: "utf8" });
 
-  content = `\
-import initWasmInstance from "./ffprobe-wasm.wasm";
-const initWasm = (info = {}) =>
-  initWasmInstance(info).then((exports) => ({ instance: { exports } }));
-${content}`;
+//   content = `\
+// import initWasmInstance from "./ffprobe-wasm.wasm";
+// const initWasm = (info = {}) =>
+//   initWasmInstance(info).then((exports) => ({ instance: { exports } }));
+// ${content}`;
 
   content = content.replace(`import.meta.url`, `''`);
-
-  content = content.replace(
-    `instantiateAsync();`,
-    `initWasm();`
-  );
+  content = content.replace(`wasmBinaryFile="ffprobe-wasm.wasm"`, `wasmBinaryFile="./ffprobe-wasm.wasm"`)
+  // content = content.replace(
+  //   `instantiateAsync();`,
+  //   `initWasm();`
+  // );
 
   await writeFile(wasmMJsPath, content, { encoding: "utf8" });
   await writeFile(wasmMJsPathSave, content, { encoding: "utf8" });
