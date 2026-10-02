@@ -11,7 +11,7 @@ export default defineConfig({
       fileName: () => "browser.mjs",
     },
     rollupOptions:{
-      external:[ '/ffprobe-wasm.wasm' ]
+      external:[ './ffprobe-wasm.wasm' ]
     },
     emptyOutDir: false,
     minify: false,
@@ -19,7 +19,7 @@ export default defineConfig({
   },
   worker: {
     rollupOptions: {
-      external: [ '/ffprobe-wasm.wasm' ]
+      external: [ './ffprobe-wasm.wasm' ]
     },
     plugins: [
       {

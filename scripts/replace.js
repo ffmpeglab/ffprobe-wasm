@@ -17,12 +17,12 @@ async function main() {
   let content = await readFile(wasmJsPath, { encoding: "utf8" });
 
   content = `\
+import initWasmInstance from "./ffprobe-wasm.wasm";
 const initWasm = (info = {}) =>
-  import("/ffprobe-wasm.wasm").then((exports) => ({ instance: { exports } }));
+  initWasmInstance(info).then((exports) => ({ instance: { exports } }));
 ${content}`;
 
   content = content.replace(`import.meta.url`, `''`);
-  // content = content.replace(`wasmBinaryFile="ffprobe-wasm.wasm"`, `wasmBinaryFile="/ffprobe-wasm.wasm"`)
   content = content.replace(
     `instantiateAsync();`,
     `initWasm(info);`
