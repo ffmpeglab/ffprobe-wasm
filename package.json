@@ -18,13 +18,13 @@
   "author": "FFmpegLab <info@ffmpeglab.com>",
   "license": "MIT",
   "exports": {
-    "node": "./dist/node.mjs",
-    "types": "./dist/ffprobe-worker.d.mts",
-    "default": "./dist/browser.mjs"
+    "node": "./node.mjs",
+    "types": "./ffprobe-worker.d.mts",
+    "default": "./browser.mjs"
   },
-  "main": "./dist/node.mjs",
-  "types": "./dist/ffprobe-worker.d.mts",
-  "browser": "./dist/browser.mjs",
+  "main": "./node.mjs",
+  "types": "./ffprobe-worker.d.mts",
+  "browser": "./browser.mjs",
   "scripts": {
     "build": "npm run tsc && npm run vite",
     "tsc": "tsc",
