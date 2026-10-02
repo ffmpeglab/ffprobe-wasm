@@ -18,11 +18,10 @@
   "author": "FFmpegLab <info@ffmpeglab.com>",
   "license": "MIT",
   "exports": {
-    "node": "./node.mjs",
     "types": "./ffprobe-worker.d.mts",
     "default": "./browser.mjs"
   },
-  "main": "./node.mjs",
+  "main": "./browser.mjs",
   "types": "./ffprobe-worker.d.mts",
   "browser": "./browser.mjs",
   "scripts": {
