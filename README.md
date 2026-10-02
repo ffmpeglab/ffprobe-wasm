@@ -1,4 +1,4 @@
-# ffmpeglab-ffprobe-wasm
+# ffprobe-browser
 
 Gather information from multimedia streams. Works on the browser and Node.js.
 
@@ -9,7 +9,7 @@ _For limitations and recommendations, see [Notes section](#notes)._
 ## Installation
 
 ```sh
-npm install ffmpeglab-ffprobe-wasm --save
+npm install ffprobe-browser --save
 ```
 
 ## Examples
@@ -17,7 +17,7 @@ npm install ffmpeglab-ffprobe-wasm --save
 Node.js
 
 ```ts
-import { FFprobeWorker } from "ffmpeglab-ffprobe-wasm";
+import { FFprobeWorker } from "ffprobe-browser";
 
 const worker = new FFprobeWorker();
 
@@ -28,7 +28,7 @@ console.log(fileInfo);
 Browser
 
 ```ts
-import { FFprobeWorker } from "ffmpeglab-ffprobe-wasm";
+import { FFprobeWorker } from "ffprobe-browser";
 
 const worker = new FFprobeWorker();
 
