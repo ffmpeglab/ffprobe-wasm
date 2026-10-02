@@ -18,7 +18,7 @@ async function main() {
 
   content = `\
 import initWasmInstance from "./ffprobe-wasm.wasm";
-const initWasm = (info) =>
+const initWasm = (info = {}) =>
   initWasmInstance(info).then((exports) => ({ instance: { exports } }));
 ${content}`;
 
@@ -26,7 +26,7 @@ ${content}`;
 
   content = content.replace(
     `instantiateAsync();`,
-    `initWasm(info);`
+    `initWasm();`
   );
 
   await writeFile(wasmMJsPath, content, { encoding: "utf8" });
