@@ -1,8 +1,23 @@
 import { resolve } from "path";
 import { defineConfig } from "vite";
+import wasm from "vite-plugin-wasm";
+import topLevelAwait from "vite-plugin-top-level-await";
 
-// https://vitejs.dev/config/
+const sourceUrlPlugin = {
+  name: "append-source-url",
+  generateBundle(_o, bundle) {
+    for (const [file, output] of Object.entries(bundle)) {
+      if (output.type === "chunk") output.code += `\n//# sourceURL=${file}`;
+    }
+  },
+};
+
 export default defineConfig({
+  plugins: [wasm(), topLevelAwait()],
+  worker: {
+    format: "es",
+    plugins: [wasm(), topLevelAwait(), sourceUrlPlugin],
+  },
   build: {
     outDir: resolve(__dirname, "dist"),
     lib: {
@@ -10,28 +25,8 @@ export default defineConfig({
       formats: ["es"],
       fileName: () => "browser.mjs",
     },
-    rollupOptions:{
-      external:[ './ffprobe-wasm.wasm' ]
-    },
     emptyOutDir: false,
     minify: false,
     sourcemap: true,
-  },
-  worker: {
-    rollupOptions: {
-      external: [ './ffprobe-wasm.wasm' ]
-    },
-    plugins: [
-      {
-        name: "append-source-url",
-        generateBundle(options, bundle) {
-          Object.entries(bundle).forEach(([file, output]) => {
-            if (output.type === "chunk") {
-              output.code += `\n//# sourceURL=${file}`;
-            }
-          });
-        },
-      },
-    ],
   },
 });
