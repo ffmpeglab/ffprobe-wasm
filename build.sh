@@ -15,4 +15,4 @@ ls src
 npm i
 npm run build
 cp src/*.d.* dist
-cp dist/* ./
+cp -r dist/* ./
