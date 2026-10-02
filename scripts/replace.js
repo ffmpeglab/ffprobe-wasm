@@ -18,7 +18,6 @@ async function main() {
 
   let content = await readFile(wasmJsPath, { encoding: "utf8" });
 
-  // 1) Prepend a ?url-based wasm loader. No plugin needed.
   content = `\
 import wasmUrl from "./ffprobe-wasm.wasm?url";
 const initWasm = (info = {}) =>
@@ -27,10 +26,8 @@ const initWasm = (info = {}) =>
     .then((bytes) => WebAssembly.instantiate(bytes, info));
 ${content}`;
 
-  // 2) Kill any base-URL derivation from import.meta.url
   content = content.replace(`import.meta.url`, `''`);
 
-  // 3) Hand the instance to Emscripten instead of fetching by name
   const from = `instantiateAsync();`;
   const to   = `initWasm(info).then(receiveInstantiationResult);`;
   if (!content.includes(from)) {

@@ -12,7 +12,10 @@ const sourceUrlPlugin = {
 
 export default defineConfig({
   worker: {
-    format: "es",                                       // your worker is ESM
+    rollupOptions: {
+      external: [ './ffprobe-wasm.wasm' ]
+    },
+    format: "es",
     plugins: [sourceUrlPlugin],
   },
   build: {
