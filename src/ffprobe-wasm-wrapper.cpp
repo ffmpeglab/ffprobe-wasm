@@ -114,10 +114,15 @@ FileInfoResponse get_file_info(std::string filename) {
     }
 
     // Initialize response struct with format data.
+    // AVFormatContext::duration can be AV_NOPTS_VALUE for still images
+    // (JPEG/PNG/BMP/WebP). Casting that sentinel to float produces a huge
+    // negative number, so normalize it to 0.
     FileInfoResponse r = {
       .name = pFormatContext->iformat->name,
       .bit_rate = (float)pFormatContext->bit_rate,
-      .duration = (float)pFormatContext->duration,
+      .duration = pFormatContext->duration == AV_NOPTS_VALUE
+          ? 0.0f
+          : (float)pFormatContext->duration,
       .url = pFormatContext->url,
       .nb_streams = (int)pFormatContext->nb_streams,
       .flags = pFormatContext->flags,
@@ -165,7 +170,8 @@ FileInfoResponse get_file_info(std::string filename) {
       }
 
       r.streams.push_back(stream);
-      free(fourcc);
+      // NOTE: `fourcc` is stack-allocated; the original `free(fourcc)` here
+      // was undefined behaviour. Removed.
     }
 
     // Loop through the chapters (if any).
@@ -230,43 +236,63 @@ FramesResponse get_frames(std::string filename, int timestamp) {
     AVCodec  *pCodec = NULL;
     AVCodecParameters *pCodecParameters = NULL;
     int video_stream_index = -1;
-    int nb_frames = 0;
 
-    // Loop through the streams.
+    // Pick the first video stream. No stream-counting here — the
+    // stream-metadata sanitisation happens further down once we know
+    // we actually have a video stream to work with.
     for (int i = 0; i < pFormatContext->nb_streams; i++) {
-      AVCodecParameters *pLocalCodecParameters = NULL;
-      pLocalCodecParameters = pFormatContext->streams[i]->codecpar;
-
-      // Print out the decoded frame info.
+      AVCodecParameters *pLocalCodecParameters = pFormatContext->streams[i]->codecpar;
       AVCodec *pLocalCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
-      if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_VIDEO) {
-        if (video_stream_index == -1) {
-          video_stream_index = i;
-          nb_frames = pFormatContext->streams[i]->nb_frames;
-
-          // Calculate the nb_frames for MKV/WebM if nb_frames is 0.
-          if (nb_frames == 0) {
-            nb_frames = (pFormatContext->duration / 1000000) * pFormatContext->streams[i]->avg_frame_rate.num;
-          }
-          pCodec = pLocalCodec;
-          pCodecParameters = pLocalCodecParameters;
-        }
+      if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_VIDEO
+          && video_stream_index == -1) {
+        video_stream_index = i;
+        pCodec             = pLocalCodec;
+        pCodecParameters   = pLocalCodecParameters;
       }
     }
 
-    AVRational stream_time_base = pFormatContext->streams[video_stream_index]->time_base;
-    AVRational avg_frame_rate = pFormatContext->streams[video_stream_index]->avg_frame_rate;
-    // printf("stream_time_base: %d / %d = %.5f\n", stream_time_base.num, stream_time_base.den, av_q2d(stream_time_base));
+    // Nothing to decode.
+    if (video_stream_index == -1) {
+      FramesResponse empty;
+      avformat_close_input(&pFormatContext);
+      return empty;
+    }
+
+    AVStream *video_stream = pFormatContext->streams[video_stream_index];
+    AVRational stream_time_base = video_stream->time_base;
+    AVRational avg_frame_rate   = video_stream->avg_frame_rate;
+
+    // Still images report avg_frame_rate = 0/0. av_q2d() on that is NaN.
+    bool has_fps = avg_frame_rate.num > 0 && avg_frame_rate.den > 0;
+
+    // Heuristic for "this is a still image": at most one frame and no fps.
+    bool single_frame = video_stream->nb_frames <= 1 && !has_fps;
 
     FramesResponse r;
-    r.nb_frames = nb_frames;
-    r.time_base = av_q2d(stream_time_base);
-    r.avg_frame_rate = av_q2d(avg_frame_rate);
-    r.duration = pFormatContext->streams[video_stream_index]->duration;
+    r.time_base      = av_q2d(stream_time_base);
+    r.avg_frame_rate = has_fps ? av_q2d(avg_frame_rate) : 0.0;
+    r.nb_frames      = single_frame ? 1 : (int)video_stream->nb_frames;
 
-    // If the duration value isn't in the stream, get from the FormatContext.
-    if (r.duration == 0) {
-      r.duration = pFormatContext->duration * r.time_base;
+    // Fallback frame count for containers that don't set nb_frames
+    // (MKV/WebM) — only attempt it when fps and container duration are
+    // both sane.
+    if (r.nb_frames == 0
+        && has_fps
+        && pFormatContext->duration != AV_NOPTS_VALUE
+        && pFormatContext->duration > 0) {
+      double seconds = (double)pFormatContext->duration / 1000000.0;
+      double fps = (double)avg_frame_rate.num / (double)avg_frame_rate.den;
+      r.nb_frames = (int)(seconds * fps);
+    }
+
+    // Stream duration, falling back to the container duration.
+    r.duration = video_stream->duration == AV_NOPTS_VALUE
+        ? 0.0f
+        : (float)video_stream->duration;
+    if (r.duration == 0.0f
+        && pFormatContext->duration != AV_NOPTS_VALUE
+        && pFormatContext->duration > 0) {
+      r.duration = (float)(pFormatContext->duration * r.time_base);
     }
 
     AVCodecContext *pCodecContext = avcodec_alloc_context3(pCodec);
@@ -280,8 +306,11 @@ FramesResponse get_frames(std::string filename, int timestamp) {
     int frame_count = 0;
     int key_frames = 0;
 
-    // Seek to frame from the given timestamp.
-    av_seek_frame(pFormatContext, video_stream_index, timestamp, AVSEEK_FLAG_ANY);
+    // Seek to the requested timestamp, but only for real videos. A still
+    // image has a single packet at t=0, and seeking to a nonzero timestamp
+    // just makes libav skip it.
+    int seek_target = single_frame ? 0 : timestamp;
+    av_seek_frame(pFormatContext, video_stream_index, seek_target, AVSEEK_FLAG_ANY);
 
     // Read video frames.
     while (av_read_frame(pFormatContext, pPacket) >= 0) {
@@ -317,7 +346,7 @@ FramesResponse get_frames(std::string filename, int timestamp) {
       }
       av_packet_unref(pPacket);
     }
-    r.gop_size = frame_count;
+    r.gop_size = (int)r.frames.size();
 
     avformat_close_input(&pFormatContext);
     av_packet_free(&pPacket);
