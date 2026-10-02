@@ -25,8 +25,8 @@ ${content}`;
   content = content.replace(`import.meta.url`, `''`);
 
   content = content.replace(
-    `instantiateAsync().catch(readyPromiseReject)`,
-    `initWasm(info).then(receiveInstantiatedSource, readyPromiseReject)`
+    `instantiateAsync();`,
+    `initWasm(info);`
   );
 
   await writeFile(wasmMJsPath, content, { encoding: "utf8" });
