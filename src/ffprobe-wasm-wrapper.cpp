@@ -114,11 +114,16 @@ FileInfoResponse get_file_info(std::string filename) {
     }
 
     // Initialize response struct with format data.
+    // AVFormatContext::duration can be AV_NOPTS_VALUE for still images
+    // (JPEG/PNG/BMP/static WebP). Casting that sentinel to float produces a
+    // huge negative number, so normalize it to 0.
     FileInfoResponse r = {
       .name = pFormatContext->iformat->name,
       .bit_rate = (float)pFormatContext->bit_rate,
-      .duration = (float)pFormatContext->duration,
-      .url = pFormatContext->url,
+      .duration = pFormatContext->duration == AV_NOPTS_VALUE
+          ? 0.0f
+          : (float)pFormatContext->duration,
+      .url = pFormatContext->url ? pFormatContext->url : "",
       .nb_streams = (int)pFormatContext->nb_streams,
       .flags = pFormatContext->flags,
       .nb_chapters = (int)pFormatContext->nb_chapters
@@ -126,10 +131,10 @@ FileInfoResponse get_file_info(std::string filename) {
 
     // Loop through the streams.
     for (int i = 0; i < pFormatContext->nb_streams; i++) {
-      AVCodecParameters *pLocalCodecParameters = NULL;
-      pLocalCodecParameters = pFormatContext->streams[i]->codecpar;
+      AVCodecParameters *pLocalCodecParameters = pFormatContext->streams[i]->codecpar;
 
-      // Convert to char byte array.
+      // Convert codec_tag to a 4-char string. Empty for formats that don't
+      // set a tag (image2, raw streams, some TS).
       uint32_t n = pLocalCodecParameters->codec_tag;
       char fourcc[5];
       for (int j = 0; j < 4; ++j) {
@@ -137,15 +142,32 @@ FileInfoResponse get_file_info(std::string filename) {
       }
       fourcc[4] = 0x00; // NULL terminator.
 
+      // av_get_pix_fmt_name returns NULL for AV_PIX_FMT_NONE (all audio
+      // streams, and some video streams). Assigning NULL to std::string is
+      // UB, so substitute an empty string.
+      const char *pix_fmt_name =
+          av_get_pix_fmt_name((AVPixelFormat)pLocalCodecParameters->format);
+
+      // avcodec_profile_name returns NULL for FF_PROFILE_UNKNOWN (JPEG,
+      // PNG, and many others). Same treatment.
+      const char *profile_name =
+          avcodec_profile_name(pLocalCodecParameters->codec_id,
+                               pLocalCodecParameters->profile);
+
+      // Stream timestamps are AV_NOPTS_VALUE for containers that don't
+      // carry them (image2, raw streams). Normalize to 0.
+      int64_t st = pFormatContext->streams[i]->start_time;
+      int64_t du = pFormatContext->streams[i]->duration;
+
       Stream stream = {
         .id = (int)pFormatContext->streams[i]->id,
-        .start_time = (float)pFormatContext->streams[i]->start_time,
-        .duration = (float)pFormatContext->streams[i]->duration,
+        .start_time = st == AV_NOPTS_VALUE ? 0.0f : (float)st,
+        .duration = du == AV_NOPTS_VALUE ? 0.0f : (float)du,
         .codec_type = (int)pLocalCodecParameters->codec_type,
-        .codec_name = fourcc,
-        .format = av_get_pix_fmt_name((AVPixelFormat)pLocalCodecParameters->format),
+        .codec_name = std::string(fourcc),
+        .format = pix_fmt_name ? std::string(pix_fmt_name) : std::string(),
         .bit_rate = (float)pLocalCodecParameters->bit_rate,
-        .profile = avcodec_profile_name(pLocalCodecParameters->codec_id, pLocalCodecParameters->profile),
+        .profile = profile_name ? std::string(profile_name) : std::string(),
         .level = (int)pLocalCodecParameters->level,
         .width = (int)pLocalCodecParameters->width,
         .height = (int)pLocalCodecParameters->height,
@@ -165,7 +187,8 @@ FileInfoResponse get_file_info(std::string filename) {
       }
 
       r.streams.push_back(stream);
-      free(fourcc);
+      // NOTE: `fourcc` is a stack array; the original `free(fourcc)` here was
+      // undefined behaviour. Removed.
     }
 
     // Loop through the chapters (if any).
@@ -175,11 +198,11 @@ FileInfoResponse get_file_info(std::string filename) {
       // Format timebase string to buf.
       AVBPrint buf;
       av_bprint_init(&buf, 0, AV_BPRINT_SIZE_AUTOMATIC);
-      av_bprintf(&buf, "%d%s%d", chapter->time_base.num, (char *)"/", chapter->time_base.den);
+      av_bprintf(&buf, "%d/%d", chapter->time_base.num, chapter->time_base.den);
 
       Chapter c = {
         .id = (int)chapter->id,
-        .time_base = buf.str,
+        .time_base = std::string(buf.str),
         .start = (float)chapter->start,
         .end = (float)chapter->end,
       };
@@ -226,47 +249,68 @@ FramesResponse get_frames(std::string filename, int timestamp) {
       printf("ERROR: could not get stream info\n");
     }
 
-    // Get streams data.
-    AVCodec  *pCodec = NULL;
+    // Pick the first video stream. Any stream-counting happens further down
+    // once we know we actually have a video stream to work with.
+    AVCodec *pCodec = NULL;
     AVCodecParameters *pCodecParameters = NULL;
     int video_stream_index = -1;
-    int nb_frames = 0;
 
-    // Loop through the streams.
     for (int i = 0; i < pFormatContext->nb_streams; i++) {
-      AVCodecParameters *pLocalCodecParameters = NULL;
-      pLocalCodecParameters = pFormatContext->streams[i]->codecpar;
-
-      // Print out the decoded frame info.
+      AVCodecParameters *pLocalCodecParameters = pFormatContext->streams[i]->codecpar;
       AVCodec *pLocalCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
-      if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_VIDEO) {
-        if (video_stream_index == -1) {
-          video_stream_index = i;
-          nb_frames = pFormatContext->streams[i]->nb_frames;
-
-          // Calculate the nb_frames for MKV/WebM if nb_frames is 0.
-          if (nb_frames == 0) {
-            nb_frames = (pFormatContext->duration / 1000000) * pFormatContext->streams[i]->avg_frame_rate.num;
-          }
-          pCodec = pLocalCodec;
-          pCodecParameters = pLocalCodecParameters;
-        }
+      if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_VIDEO
+          && video_stream_index == -1) {
+        video_stream_index = i;
+        pCodec             = pLocalCodec;
+        pCodecParameters   = pLocalCodecParameters;
       }
     }
 
-    AVRational stream_time_base = pFormatContext->streams[video_stream_index]->time_base;
-    AVRational avg_frame_rate = pFormatContext->streams[video_stream_index]->avg_frame_rate;
-    // printf("stream_time_base: %d / %d = %.5f\n", stream_time_base.num, stream_time_base.den, av_q2d(stream_time_base));
+    // No video stream — bail out cleanly instead of indexing streams[-1].
+    if (video_stream_index == -1) {
+      FramesResponse empty;
+      avformat_close_input(&pFormatContext);
+      return empty;
+    }
+
+    AVStream *video_stream = pFormatContext->streams[video_stream_index];
+    AVRational stream_time_base = video_stream->time_base;
+    AVRational avg_frame_rate   = video_stream->avg_frame_rate;
+
+    // Still images report avg_frame_rate = 0/0. av_q2d() on that is NaN, and
+    // NaN propagates through every arithmetic op downstream.
+    bool has_fps = avg_frame_rate.num > 0 && avg_frame_rate.den > 0;
+
+    // Heuristic: a still image has at most one frame and no fps. True for
+    // JPEG/PNG/BMP/static WebP, false for videos and animated GIF/WebP.
+    bool single_frame = video_stream->nb_frames <= 1 && !has_fps;
 
     FramesResponse r;
-    r.nb_frames = nb_frames;
-    r.time_base = av_q2d(stream_time_base);
-    r.avg_frame_rate = av_q2d(avg_frame_rate);
-    r.duration = pFormatContext->streams[video_stream_index]->duration;
+    r.time_base      = av_q2d(stream_time_base);
+    r.avg_frame_rate = has_fps ? av_q2d(avg_frame_rate) : 0.0;
+    r.nb_frames      = single_frame ? 1 : (int)video_stream->nb_frames;
 
-    // If the duration value isn't in the stream, get from the FormatContext.
-    if (r.duration == 0) {
-      r.duration = pFormatContext->duration * r.time_base;
+    // Fallback frame count for containers that don't set nb_frames
+    // (MKV/WebM). Only meaningful when fps and container duration are both
+    // sane — otherwise we'd be multiplying garbage by garbage.
+    if (r.nb_frames == 0
+        && has_fps
+        && pFormatContext->duration != AV_NOPTS_VALUE
+        && pFormatContext->duration > 0) {
+      double seconds = (double)pFormatContext->duration / 1000000.0;
+      double fps = (double)avg_frame_rate.num / (double)avg_frame_rate.den;
+      r.nb_frames = (int)(seconds * fps);
+    }
+
+    // Stream duration, falling back to container duration. Both are
+    // AV_NOPTS_VALUE for still images.
+    r.duration = video_stream->duration == AV_NOPTS_VALUE
+        ? 0.0f
+        : (float)video_stream->duration;
+    if (r.duration == 0.0f
+        && pFormatContext->duration != AV_NOPTS_VALUE
+        && pFormatContext->duration > 0) {
+      r.duration = (float)(pFormatContext->duration * r.time_base);
     }
 
     AVCodecContext *pCodecContext = avcodec_alloc_context3(pCodec);
@@ -280,8 +324,11 @@ FramesResponse get_frames(std::string filename, int timestamp) {
     int frame_count = 0;
     int key_frames = 0;
 
-    // Seek to frame from the given timestamp.
-    av_seek_frame(pFormatContext, video_stream_index, timestamp, AVSEEK_FLAG_ANY);
+    // Seek to the requested timestamp, but only for real videos. A still
+    // image has a single packet at t=0; seeking to a nonzero timestamp just
+    // makes libav skip it.
+    int seek_target = single_frame ? 0 : timestamp;
+    av_seek_frame(pFormatContext, video_stream_index, seek_target, AVSEEK_FLAG_ANY);
 
     // Read video frames.
     while (av_read_frame(pFormatContext, pPacket) >= 0) {
@@ -317,7 +364,10 @@ FramesResponse get_frames(std::string filename, int timestamp) {
       }
       av_packet_unref(pPacket);
     }
-    r.gop_size = frame_count;
+
+    // gop_size used to count packets processed; frame_count drifts from the
+    // actual number of frames returned. Report the real count instead.
+    r.gop_size = (int)r.frames.size();
 
     avformat_close_input(&pFormatContext);
     av_packet_free(&pPacket);
