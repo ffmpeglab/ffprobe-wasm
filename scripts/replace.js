@@ -34,14 +34,16 @@ ${content}`;
     throw new Error("post-build: `instantiateAsync();` not found");
   }
   content = content.replace(from, to);
-  const finalRun = `run();`;
-  if (!content.includes(finalRun)) {
-    throw new Error("post-build: final `run();` not found");
+  const marker = "run();";
+  const lastIdx = content.lastIndexOf(marker);
+  if (lastIdx === -1) {
+    throw new Error("post-build: `run();` not found");
   }
-  content = content.replace(
-    finalRun,
-    `${finalRun}\nexport default Module;`,
-  );
+  content =
+    content.slice(0, lastIdx + marker.length) +
+    "\nexport default Module;\n" +
+    content.slice(lastIdx + marker.length);
+    
   await writeFile(wasmMJsPath, content, { encoding: "utf8" });
   await writeFile(wasmMJsPathSav, content, { encoding: "utf8" });
 }
