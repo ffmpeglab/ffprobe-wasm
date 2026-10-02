@@ -23,7 +23,7 @@ async function main() {
 // ${content}`;
 
   content = content.replace(`import.meta.url`, `''`);
-  content = content.replace(`wasmBinaryFile="ffprobe-wasm.wasm"`, `wasmBinaryFile="./ffprobe-wasm.wasm"`)
+  content = content.replace(`wasmBinaryFile="ffprobe-wasm.wasm"`, `wasmBinaryFile="/ffprobe-wasm.wasm"`)
   // content = content.replace(
   //   `instantiateAsync();`,
   //   `initWasm();`
