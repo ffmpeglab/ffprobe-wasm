@@ -2,7 +2,7 @@
 
 # Exit on error
 set -e
-
+rm -rf ./dist
 docker build -t ffprobe-wasm .
 docker create -ti --name ffprobe-wasm-container ffprobe-wasm
 docker cp ffprobe-wasm-container:/build/dist .
@@ -15,4 +15,3 @@ ls src
 npm i
 npm run build
 cp src/*.d.* dist
-cp -r dist/* ./

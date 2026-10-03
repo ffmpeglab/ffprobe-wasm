@@ -3,6 +3,7 @@
 # Exit on error
 set -e
 
+cp -r dist/* ./
 node -e 'const json=require("./package.json");fs.writeFileSync("./package.json",JSON.stringify({...json, version:process.env.GITHUB_REF?.replace("refs/tags/", "")}, undefined, 2), "utf-8")'
 cat package.json 
 npm config set '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"

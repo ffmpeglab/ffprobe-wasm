@@ -18,7 +18,16 @@ export default defineConfig({
     format: "es",
     plugins: [sourceUrlPlugin],
   },
+  esbuild: {
+    target: "es2020",
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: "es2020",
+    },
+  },
   build: {
+    target: "es2020",
     outDir: resolve(__dirname, "dist"),
     lib: {
       entry: resolve(__dirname, "dist/browser-vite.mjs"),
