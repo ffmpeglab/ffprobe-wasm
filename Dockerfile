@@ -1,55 +1,37 @@
-FROM emscripten/emsdk:3.1.15 as build
+FROM emscripten/emsdk:6.0.9 AS build
+
+# LLVM tools live in /emsdk/upstream/bin and are not on PATH
+ENV PATH="/emsdk/upstream/bin:${PATH}"
 
 ARG FFMPEG_VERSION=4.3.1
-ARG X264_VERSION=20170226-2245-stable
-ARG LAME_VERSION=3.100 
-
+ARG ZLIB_VERSION=1.3.1
 ARG PREFIX=/opt/ffmpeg
 ARG MAKEFLAGS="-j4"
 
 RUN apt-get update && apt-get install -y autoconf libtool build-essential
 
-# libx264
+# zlib — FFmpeg's PNG decoder needs inflate()/crc32().
 RUN cd /tmp && \
-  wget https://download.videolan.org/pub/videolan/x264/snapshots/x264-snapshot-${X264_VERSION}.tar.bz2 && \
-  tar xvfj x264-snapshot-${X264_VERSION}.tar.bz2
+  wget https://zlib.net/fossils/zlib-${ZLIB_VERSION}.tar.gz && \
+  tar xzf zlib-${ZLIB_VERSION}.tar.gz
 
-RUN cd /tmp/x264-snapshot-${X264_VERSION} && \
+RUN cd /tmp/zlib-${ZLIB_VERSION} && \
   emconfigure ./configure \
   --prefix=${PREFIX} \
-  --host=i686-gnu \
-  --enable-static \
-  --disable-cli \
-  --disable-asm \
-  --extra-cflags="-s USE_PTHREADS=1"
+  --static
 
-RUN cd /tmp/x264-snapshot-${X264_VERSION} && \
-  emmake make && emmake make install 
-
-# libmp3lame
-RUN cd /tmp && \
-  wget -O lame-${LAME_VERSION}.tar.gz https://sourceforge.net/projects/lame/files/lame/${LAME_VERSION}/lame-${LAME_VERSION}.tar.gz/download && \
-  tar zxf lame-${LAME_VERSION}.tar.gz
-
-RUN cd /tmp/lame-${LAME_VERSION} && \
-  emconfigure ./configure \
-  --prefix=${PREFIX} \
-  --host=i686-gnu \
-  --enable-static \
-  --disable-frontend
-
-RUN cd /tmp/lame-${LAME_VERSION} && \
-  emmake make && emmake make install 
+RUN cd /tmp/zlib-${ZLIB_VERSION} && \
+  emmake make -j4 && \
+  emmake make install
 
 # Get ffmpeg source.
-RUN cd /tmp/ && \
+RUN cd /tmp && \
   wget http://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz && \
   tar zxf ffmpeg-${FFMPEG_VERSION}.tar.gz && rm ffmpeg-${FFMPEG_VERSION}.tar.gz
 
-ARG CFLAGS="-s USE_PTHREADS=1 -O3 -I${PREFIX}/include"
-ARG LDFLAGS="$CFLAGS -L${PREFIX}/lib -s INITIAL_MEMORY=33554432"
+ARG CFLAGS="-O3 -I${PREFIX}/include"
+ARG LDFLAGS="-L${PREFIX}/lib -s INITIAL_MEMORY=33554432"
 
-# Compile ffmpeg.
 RUN cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
   emconfigure ./configure \
   --prefix=${PREFIX} \
@@ -63,21 +45,18 @@ RUN cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
   --disable-programs \
   --disable-doc \
   --disable-all \
+  --disable-network \
+  --disable-everything \
   --enable-avcodec \
   --enable-avformat \
-  --enable-avfilter \
-  --enable-avdevice \
   --enable-avutil \
-  --enable-swresample \
-  --enable-postproc \
   --enable-swscale \
+  --enable-swresample \
   --enable-protocol=file \
-  --enable-decoder=h264,aac,pcm_s16le,mp3 \
-  --enable-demuxer=mov,matroska,mp3 \
-  --enable-muxer=mp4 \
-  --enable-gpl \
-  --enable-libx264 \
-  --enable-libmp3lame \
+  --enable-zlib \
+  --enable-decoder=h264,aac,pcm_s16le,mp3,mjpeg,png,gif,bmp,tiff,webp \
+  --enable-demuxer=mov,matroska,mp3,image2 \
+  --enable-parser=h264,aac,mpegaudio,png \
   --extra-cflags="$CFLAGS" \
   --extra-cxxflags="$CFLAGS" \
   --extra-ldflags="$LDFLAGS" \
@@ -86,14 +65,11 @@ RUN cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
   --as=llvm-as \
   --ranlib=llvm-ranlib \
   --cc=emcc \
-  --cxx=em++ \
-  --objcc=emcc \
-  --dep-cc=emcc
+  --cxx=em++
 
 RUN cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
   emmake make -j4 && \
   emmake make install
-
 
 COPY ./src/ffprobe-wasm-wrapper.cpp /build/src/ffprobe-wasm-wrapper.cpp
 COPY ./Makefile /build/Makefile

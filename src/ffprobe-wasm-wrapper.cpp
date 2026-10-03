@@ -88,6 +88,66 @@ typedef struct FramesResponse {
   double avg_frame_rate;
 } FramesResponse;
 
+static void fill_stream_info_from_frame(AVFormatContext *pFormatContext,
+                                        int stream_index,
+                                        AVCodecParameters *codecpar) {
+    if (codecpar->codec_type != AVMEDIA_TYPE_VIDEO) return;
+
+    // Already populated (most containers) — nothing to do.
+    if (codecpar->width > 0 && codecpar->height > 0 &&
+        codecpar->format != AV_PIX_FMT_NONE) {
+        return;
+    }
+
+    const AVCodec *codec = avcodec_find_decoder(codecpar->codec_id);
+    if (!codec) return;
+
+    AVCodecContext *cctx = avcodec_alloc_context3(codec);
+    if (!cctx) return;
+
+    if (avcodec_parameters_to_context(cctx, codecpar) < 0) {
+        avcodec_free_context(&cctx);
+        return;
+    }
+    if (avcodec_open2(cctx, codec, NULL) < 0) {
+        avcodec_free_context(&cctx);
+        return;
+    }
+
+    AVPacket *pkt = av_packet_alloc();
+    AVFrame  *frm = av_frame_alloc();
+    if (!pkt || !frm) {
+        av_packet_free(&pkt);
+        av_frame_free(&frm);
+        avcodec_free_context(&cctx);
+        return;
+    }
+
+    // Read packets until we get one decoded frame or run out.
+    while (av_read_frame(pFormatContext, pkt) >= 0) {
+        if (pkt->stream_index == stream_index) {
+            if (avcodec_send_packet(cctx, pkt) >= 0) {
+                int r = avcodec_receive_frame(cctx, frm);
+                if (r == 0) {
+                    codecpar->width  = frm->width;
+                    codecpar->height = frm->height;
+                    codecpar->format = frm->format;
+                    av_packet_unref(pkt);
+                    break;
+                }
+            }
+        }
+        av_packet_unref(pkt);
+    }
+
+    av_frame_free(&frm);
+    av_packet_free(&pkt);
+    avcodec_free_context(&cctx);
+
+    // Rewind so any subsequent read starts at the beginning again.
+    av_seek_frame(pFormatContext, -1, 0, AVSEEK_FLAG_BACKWARD);
+}
+
 FileInfoResponse get_file_info(std::string filename) {
     av_log_set_level(AV_LOG_QUIET); // No logging output for libav.
 
@@ -113,10 +173,6 @@ FileInfoResponse get_file_info(std::string filename) {
       printf("ERROR: could not get stream info\n");
     }
 
-    // Initialize response struct with format data.
-    // AVFormatContext::duration can be AV_NOPTS_VALUE for still images
-    // (JPEG/PNG/BMP/static WebP). Casting that sentinel to float produces a
-    // huge negative number, so normalize it to 0.
     FileInfoResponse r = {
       .name = pFormatContext->iformat->name,
       .bit_rate = (float)pFormatContext->bit_rate,
@@ -133,29 +189,17 @@ FileInfoResponse get_file_info(std::string filename) {
     for (int i = 0; i < pFormatContext->nb_streams; i++) {
       AVCodecParameters *pLocalCodecParameters = pFormatContext->streams[i]->codecpar;
 
-      // Convert codec_tag to a 4-char string. Empty for formats that don't
-      // set a tag (image2, raw streams, some TS).
-      uint32_t n = pLocalCodecParameters->codec_tag;
-      char fourcc[5];
-      for (int j = 0; j < 4; ++j) {
-        fourcc[j] = (n >> (j * 8) & 0xFF);
-      }
-      fourcc[4] = 0x00; // NULL terminator.
+      fill_stream_info_from_frame(pFormatContext, i, pLocalCodecParameters);
 
-      // av_get_pix_fmt_name returns NULL for AV_PIX_FMT_NONE (all audio
-      // streams, and some video streams). Assigning NULL to std::string is
-      // UB, so substitute an empty string.
+      const char *codec_name = avcodec_get_name(pLocalCodecParameters->codec_id);
+
       const char *pix_fmt_name =
           av_get_pix_fmt_name((AVPixelFormat)pLocalCodecParameters->format);
 
-      // avcodec_profile_name returns NULL for FF_PROFILE_UNKNOWN (JPEG,
-      // PNG, and many others). Same treatment.
       const char *profile_name =
           avcodec_profile_name(pLocalCodecParameters->codec_id,
                                pLocalCodecParameters->profile);
 
-      // Stream timestamps are AV_NOPTS_VALUE for containers that don't
-      // carry them (image2, raw streams). Normalize to 0.
       int64_t st = pFormatContext->streams[i]->start_time;
       int64_t du = pFormatContext->streams[i]->duration;
 
@@ -164,7 +208,7 @@ FileInfoResponse get_file_info(std::string filename) {
         .start_time = st == AV_NOPTS_VALUE ? 0.0f : (float)st,
         .duration = du == AV_NOPTS_VALUE ? 0.0f : (float)du,
         .codec_type = (int)pLocalCodecParameters->codec_type,
-        .codec_name = std::string(fourcc),
+        .codec_name = codec_name ? std::string(codec_name) : std::string(),
         .format = pix_fmt_name ? std::string(pix_fmt_name) : std::string(),
         .bit_rate = (float)pLocalCodecParameters->bit_rate,
         .profile = profile_name ? std::string(profile_name) : std::string(),
@@ -176,7 +220,6 @@ FileInfoResponse get_file_info(std::string filename) {
         .frame_size = (int)pLocalCodecParameters->frame_size,
       };
 
-      // Add tags to stream.
       const AVDictionaryEntry *tag = NULL;
       while ((tag = av_dict_get(pFormatContext->streams[i]->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
         Tag t = {
@@ -187,15 +230,11 @@ FileInfoResponse get_file_info(std::string filename) {
       }
 
       r.streams.push_back(stream);
-      // NOTE: `fourcc` is a stack array; the original `free(fourcc)` here was
-      // undefined behaviour. Removed.
     }
 
-    // Loop through the chapters (if any).
     for (int i = 0; i < pFormatContext->nb_chapters; i++) {
       AVChapter *chapter = pFormatContext->chapters[i];
 
-      // Format timebase string to buf.
       AVBPrint buf;
       av_bprint_init(&buf, 0, AV_BPRINT_SIZE_AUTOMATIC);
       av_bprintf(&buf, "%d/%d", chapter->time_base.num, chapter->time_base.den);
@@ -207,7 +246,6 @@ FileInfoResponse get_file_info(std::string filename) {
         .end = (float)chapter->end,
       };
 
-      // Add tags to chapter.
       const AVDictionaryEntry *tag = NULL;
       while ((tag = av_dict_get(chapter->metadata, "", tag, AV_DICT_IGNORE_SUFFIX))) {
         Tag t = {
@@ -218,6 +256,20 @@ FileInfoResponse get_file_info(std::string filename) {
       }
 
       r.chapters.push_back(c);
+    }
+
+    bool looks_like_still = false;
+    for (int i = 0; i < pFormatContext->nb_streams; i++) {
+      AVStream *s = pFormatContext->streams[i];
+      if (s->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) continue;
+      AVRational fps = s->avg_frame_rate;
+      bool has_fps = fps.num > 0 && fps.den > 0;
+      looks_like_still = (s->nb_frames <= 1) && !has_fps;
+      break;
+    }
+    if (looks_like_still) {
+      r.duration = 0.0f;
+      r.bit_rate = 0.0f;
     }
 
     avformat_close_input(&pFormatContext);
