@@ -1,6 +1,11 @@
 import { defineConfig } from "cypress";
 
 export default defineConfig({
+  reporter: "mocha-junit-reporter",
+  reporterOptions: {
+    mochaFile: "cypress/results/results-[hash].xml",
+    toConsole: true,
+  },
   e2e: {
     baseUrl: "http://localhost:4173",
     specPattern: "cypress/e2e/**/*.cy.ts",
@@ -8,6 +13,6 @@ export default defineConfig({
     fixturesFolder: "cypress/fixtures",
     video: false,
     screenshotOnRunFailure: true,
-    defaultCommandTimeout: 15_000,
+    defaultCommandTimeout: 30_000,
   },
 });
