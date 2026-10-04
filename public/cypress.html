@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ffprobe-wasm Cypress host</title>
+  </head>
+  <body>
+    <h1>ffprobe-wasm Cypress host</h1>
+    <p id="status">loading…</p>
+    <script type="module">
+      import { FFprobeWorker } from "/browser.mjs";
+      window.FFprobeWorker = FFprobeWorker;
+      window.__ready = true;
+      document.getElementById("status").textContent = "ready";
+    </script>
+  </body>
+</html>

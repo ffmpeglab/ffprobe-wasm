@@ -1,22 +1,82 @@
 name: Publish Package to npmjs
+
 on:
   push:
     tags:
       - '*'
+
+permissions:
+  contents: write    
+  id-token: write    
+
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+    timeout-minutes: 60
+
     steps:
-      - uses: actions/checkout@v6
-      # Setup .npmrc file to publish to npm
-      - uses: supabase/setup-cli@v3
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Pre-warm Docker cache
+        uses: docker/build-push-action@v6
         with:
-          node-version: '22.x'
+          context: .
+          load: true
+          tags: ffprobe-wasm:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
           registry-url: 'https://registry.npmjs.org'
-      - run: ./build.sh && ./publish.sh
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Cypress E2E
+        uses: cypress-io/github-action@v6
+        with:
+          start: npx vite preview --port 4173
+          wait-on: "http://localhost:4173/cypress.html"
+          wait-on-timeout: 60
+          browser: chrome
+          install: false
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-report
+          path: |
+            cypress/results
+            cypress/screenshots
+          if-no-files-found: ignore
+
+      # Fails the job on test failure, so publish.sh never runs on red.
+      - name: Fail if tests failed
+        if: failure()
+        run: exit 1
+
+      - name: Publish to npm
+        run: ./publish.sh
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Download test report
+        uses: actions/download-artifact@v4
+        with:
+          name: cypress-report
+          path: cypress-report
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            cypress-report/results/**/*.xml
+            cypress-report/screenshots/**/*.png
