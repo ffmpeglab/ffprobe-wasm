@@ -18,20 +18,26 @@
   "author": "FFmpegLab <info@ffmpeglab.com>",
   "license": "MIT",
   "exports": {
-    "types": "./ffprobe-worker.d.mts",
+    "types": "./ffprobe-wasm.worker.d.mts",
     "default": "./browser.mjs"
   },
   "main": "./browser.mjs",
-  "types": "./ffprobe-worker.d.mts",
+  "types": "./ffprobe-wasm.worker.d.mts",
   "browser": "./browser.mjs",
   "scripts": {
     "build": "npm run tsc && npm run vite",
     "tsc": "tsc",
-    "vite": "vite build"
+    "vite": "vite build",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "test:e2e": "npm run build && start-server-and-test 'vite preview --port 4173' http://localhost:4173/cypress.html 'npm run cy:run'",
+    "test:e2e:open": "npm run build && start-server-and-test 'vite preview --port 4173' http://localhost:4173/cypress.html 'npm run cy:open'"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
     "typescript": "^5.7.3",
-    "vite": "^2.8.6"
+    "vite": "^2.8.6",
+    "cypress": "^13.15.0",
+    "start-server-and-test": "^2.0.8"
   }
 }

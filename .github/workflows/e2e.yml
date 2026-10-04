@@ -1,0 +1,84 @@
+name: E2E
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same PR.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Cross-compiling FFmpeg + zlib is 30+ minutes cold. With the GHA layer
+      # cache, a no-op run is ~1 minute. Cache is keyed on the Dockerfile,
+      # so changing FFMPEG_VERSION or the wrapper triggers a rebuild.
+      - name: Build wasm image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: ffprobe-wasm:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # build.sh does `docker create -ti`, which fails in CI (no TTY).
+      # Replicate the extraction manually.
+      - name: Extract emscripten output
+        run: |
+          docker create --name ffprobe-wasm-container ffprobe-wasm:latest
+          docker cp ffprobe-wasm-container:/build/dist .
+          docker rm -fv ffprobe-wasm-container
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Post-process emscripten glue
+        run: node scripts/replace.js
+
+      - name: Stage wasm files next to the source
+        run: cp dist/* src
+
+      - name: Build Vite bundle
+        run: npm run build
+
+      - name: Cypress E2E
+        uses: cypress-io/github-action@v6
+        with:
+          start: npx vite preview --port 4173
+          wait-on: "http://localhost:4173/cypress.html"
+          wait-on-timeout: 60
+          browser: chrome
+          install: false
+
+      - name: Upload Cypress artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-artifacts
+          path: |
+            cypress/screenshots
+            cypress/videos
+          if-no-files-found: ignore
+          retention-days: 7
