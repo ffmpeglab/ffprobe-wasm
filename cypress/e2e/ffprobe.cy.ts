@@ -92,19 +92,23 @@ describe("ffprobe-wasm", function () {
 
     describe("getFrames", () => {
         it("returns frames for a video", () => {
-    cy.loadFFProbeFile("sample.mp4", "sample.mp4", "video/mp4").then((file) => {
-        cy.wrap(worker.getFrames(file, 0)).then((info) => {
-            expect(info.frames.length).to.be.greaterThan(0);
-            expect(info.nb_frames).to.be.greaterThan(0);
+            cy.loadFFprobeFile("sample.mp4", "sample.mp4", "video/mp4").then(
+                (file) => {
+                    cy.wrap(worker.getFrames(file, 0)).then((info) => {
+                        expect(info.frames.length).to.be.greaterThan(0);
+                        expect(info.nb_frames).to.be.greaterThan(0);
 
-            const first = info.frames[0];
-            // pict_type is the ASCII code of the character ffprobe would print:
-            // 73 = 'I' (keyframe), 80 = 'P', 66 = 'B'.
-            expect(String.fromCharCode(first.pict_type)).to.match(/^[IPB]$/);
-            expect(first.pts).to.be.a("number");
+                        const first = info.frames[0];
+                        // pict_type is the ASCII code of the character ffprobe would print:
+                        // 73 = 'I' (keyframe), 80 = 'P', 66 = 'B'.
+                        expect(String.fromCharCode(first.pict_type)).to.match(
+                            /^[IPB]$/,
+                        );
+                        expect(first.pts).to.be.a("number");
+                    });
+                },
+            );
         });
-    });
-});
     });
 
     describe("validation", () => {
